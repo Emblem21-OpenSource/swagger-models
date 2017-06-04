@@ -19,7 +19,7 @@ function isValidModelName(name) {
 function getPropertyType(models, currentModel, propertySchema) {
   if (typeof propertySchema === 'string') {
     propertySchema = {
-      type: propertySchema
+      type: propertySchema,
     }
   }
 
@@ -72,7 +72,7 @@ function getPropertyType(models, currentModel, propertySchema) {
             }
 
             if (propertySchema.maxLength > 21845) {
-              return Sequelize.TEXT('medium');
+              return Sequelize.TEXT('medium')
             }
 
             // NOTE: VARCHAR(255) may container 255 multibyte chars: it's _NOT_ byte delimited
@@ -141,16 +141,33 @@ function getPropertyType(models, currentModel, propertySchema) {
  * @param  {[type]} schema [description]
  * @return {[type]}        [description]
  */
-function generate (schema) {
+function generateProperties (schema) {
+  var result = {
+    schema: schema
+    bindings: [],
+    hiddenFields: []
+  };
+
   Object.keys(schema.properties).forEach((propertyName) => {
     var propertySchema = schema.properties[propertyName];
-    propertySchema.type = getSequalizeType(propertySchema);
+    var type = getSequalizeType(propertySchema);
+    
+    if (properties.type instanceof Function) {
+      result.bindings.push(type);
+    } else {
+      propertySchema.type = type;
+    }
+
     if (propertySchema.default) {
       propertySchema.defaultValue = propertySchema.default;
     }
+
+    if(propertySchema.description.indexOf('(hidden)') > -1) {
+        result.hiddenFields.push(propertyName);
+   }
   });
 
-  return schema.properties;
+  return result;
 }
 
 /**
@@ -160,6 +177,8 @@ function generate (schema) {
  */
 module.exports = {
   initialize: function initialize(yamlPath, sequelize, options) {
+    var bindings = [];
+
     if(options === undefined) {
       options = {
         autosync: true
@@ -173,7 +192,9 @@ module.exports = {
       // Prepare models
       for (var i in swaggerConfig.definitions) {
         if (isValidModelName.call(swaggerConfig, i)) {
-          this[i] = sequelize.define(i, swaggerSequelize.generate(swaggerConfig.definitions[i]))
+          var properties = generateProperties(swaggerConfig.definitions[i]);
+          this[i] = sequelize.define(i, properties.schema)
+          bindings = bindings.concat(properties.bindings)
         }
       }
 
