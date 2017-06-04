@@ -15,5 +15,9 @@
   "bugs": {
     "url": "https://github.com/Emblem21-OpenSource/swagger-models/issues"
   },
-  "homepage": "https://github.com/Emblem21-OpenSource/swagger-models#readme"
+  "homepage": "https://github.com/Emblem21-OpenSource/swagger-models#readme",
+  "dependencies": {
+    "js-yaml": "^3.8.4",
+    "sequelize": "^3.30.4"
+  }
 }
