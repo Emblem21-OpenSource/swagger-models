@@ -1,6 +1,4 @@
-var jsyaml = require('js-yaml');
-var fs = require('fs');
-var models = {};
+var Sequelize = require('sequelize');
 
 /**
  * [validModel description]
@@ -16,20 +14,20 @@ function isValidModelName(name) {
  * @param  {[type]} propertySchema [description]
  * @return {[type]}                [description]
  */
-function getPropertyType(models, currentModel, propertySchema) {
+function getPropertyType(models, currentModelName, propertySchema) {
   if (typeof propertySchema === 'string') {
     propertySchema = {
       type: propertySchema,
-    }
+    };
   }
 
   if (propertySchema.$ref) {
-    return function postModel() {
-      var targetModelName = propertySchema.items.$ref.replace('#/definitions/', '');
+    return function binding() {
+      var targetModelName = propertySchema.$ref.replace('#/definitions/', '');
       var targetModel = models[targetModelName];
-      currentModel.hasOne(targetModel);
-      currentModel.belongsTo(targetModel, { as: targetModelName, foreignKey: 'id', constraints: false});
-    }
+      models[currentModelName].hasOne(targetModel);
+      models[currentModelName].belongsTo(targetModel, { as: targetModelName, foreignKey: 'id', constraints: false});
+    };
   }
 
   if (propertySchema.enum) {
@@ -38,101 +36,101 @@ function getPropertyType(models, currentModel, propertySchema) {
 
   // as seen http://swagger.io/specification/#dataTypeType
   switch (propertySchema.type) {
-    case 'string':
-      switch (propertySchema.format || "") {
-        case 'byte':
-        case 'binary':
-          if (propertySchema.maxLength > 5592415) {
-            return Sequelize.BLOB('long');
-          }
-
-          if (propertySchema.maxLength > 21845) {
-            return Sequelize.BLOB('medium');
-          }
-
-          // NOTE: VARCHAR(255) may container 255 multibyte chars: it's _NOT_ byte delimited
-          if (propertySchema.maxLength > 255) {
-            return Sequelize.BLOB();
-          }
-          return Sequelize.STRING.BINARY;
-
-        case 'date':
-          return Sequelize.DATEONLY;
-
-        case 'date-time':
-          return Sequelize.DATETIME;
-
-        default:
-          if (propertySchema.maxLength) {
-            // http://stackoverflow.com/questions/13932750/tinytext-text-mediumtext-and-longtext-maximum-sto
-            // http://stackoverflow.com/questions/7755629/varchar255-vs-tinytext-tinyblob-and-varchar65535-v
-            // NOTE: text may be in multibyte format!
-            if (propertySchema.maxLength > 5592415) {
-              return Sequelize.TEXT('long');
-            }
-
-            if (propertySchema.maxLength > 21845) {
-              return Sequelize.TEXT('medium')
-            }
-
-            // NOTE: VARCHAR(255) may container 255 multibyte chars: it's _NOT_ byte delimited
-            if (propertySchema.maxLength > 255) {
-              return Sequelize.TEXT();
-            }
-          }
-
-          return Sequelize.STRING; // === VARCHAR
+  case 'string':
+    switch (propertySchema.format || '') {
+    case 'byte':
+    case 'binary':
+      if (propertySchema.maxLength > 5592415) {
+        return Sequelize.BLOB('long');
       }
 
-    case 'array':
-      if (dialect === 'postgres') {
-        return Sequelize.ARRAY(getSequalizeType(propertySchema.items));
-      } else {
-        if(propertySchema.items.$ref) {
-          return function postModel () {
-            var targetModelName = propertySchema.items.$ref.replace('#/definitions/', '');
-            var targetModel = models[targetModelName];
-            currentModel.hasMany(targetModel);
-            currentModel.belongsTo(targetModel, { as: targetModelName, foreignKey: 'id', constraints: false});
-          }
-        } else {
-          console.log('Warning: encountered', JSON.stringify(propertySchema));
-          console.log('Can only handle primitive array for postgres (yet?), see http://docs.sequelizejs.com/en/latest/api/datatypes/#array, falling back to blob');
-          return Sequelize.BLOB;
-        }        
+      if (propertySchema.maxLength > 21845) {
+        return Sequelize.BLOB('medium');
       }
 
-    case 'boolean':
-      return Sequelize.BOOLEAN;
-
-    case 'integer':
-      switch (propertySchema.format || "") {
-        case 'int32':
-          if (typeof propertySchema.minimum === "number" && propertySchema.minimum >= 0) {
-            return Sequelize.INTEGER.UNSIGNED;
-          }
-          return Sequelize.INTEGER;
-
-        default:
-          if (typeof propertySchema.minimum === "number" && propertySchema.minimum >= 0) {
-            return Sequelize.BIGINT.UNSIGNED;
-          }
-          return Sequelize.BIGINT;
+      // NOTE: VARCHAR(255) may container 255 multibyte chars: it's _NOT_ byte delimited
+      if (propertySchema.maxLength > 255) {
+        return Sequelize.BLOB();
       }
+      return Sequelize.STRING.BINARY;
 
-    case 'number':
-      switch (propertySchema.format || "") {
-        case 'float':
-          return Sequelize.FLOAT;
+    case 'date':
+      return Sequelize.DATEONLY;
 
-        default:
-          return Sequelize.DOUBLE;
-      }
+    case 'date-time':
+      return Sequelize.DATETIME;
 
     default:
+      if (propertySchema.maxLength) {
+        // http://stackoverflow.com/questions/13932750/tinytext-text-mediumtext-and-longtext-maximum-sto
+        // http://stackoverflow.com/questions/7755629/varchar255-vs-tinytext-tinyblob-and-varchar65535-v
+        // NOTE: text may be in multibyte format!
+        if (propertySchema.maxLength > 5592415) {
+          return Sequelize.TEXT('long');
+        }
+
+        if (propertySchema.maxLength > 21845) {
+          return Sequelize.TEXT('medium');
+        }
+
+        // NOTE: VARCHAR(255) may container 255 multibyte chars: it's _NOT_ byte delimited
+        if (propertySchema.maxLength > 255) {
+          return Sequelize.TEXT();
+        }
+      }
+
+      return Sequelize.STRING; // === VARCHAR
+    }
+
+  case 'array':
+    // if (dialect === 'postgres') {
+    //  return Sequelize.ARRAY(getSequalizeType(propertySchema.items));
+    // } else {
+    if(propertySchema.items.$ref) {
+      return function binding () {
+        var targetModelName = propertySchema.items.$ref.replace('#/definitions/', '');
+        var targetModel = models[targetModelName];
+        models[currentModelName].hasMany(targetModel);
+        models[currentModelName].belongsTo(targetModel, { as: targetModelName, foreignKey: 'id', constraints: false});
+      };
+    } else {
       console.log('Warning: encountered', JSON.stringify(propertySchema));
-      console.log('Unknown data type, falling back to blob');
+      console.log('Can only handle primitive array for postgres (yet?), see http://docs.sequelizejs.com/en/latest/api/datatypes/#array, falling back to blob');
       return Sequelize.BLOB;
+    }        
+    // }
+
+  case 'boolean':
+    return Sequelize.BOOLEAN;
+
+  case 'integer':
+    switch (propertySchema.format || '') {
+    case 'int32':
+      if (typeof propertySchema.minimum === 'number' && propertySchema.minimum >= 0) {
+        return Sequelize.INTEGER.UNSIGNED;
+      }
+      return Sequelize.INTEGER;
+
+    default:
+      if (typeof propertySchema.minimum === 'number' && propertySchema.minimum >= 0) {
+        return Sequelize.BIGINT.UNSIGNED;
+      }
+      return Sequelize.BIGINT;
+    }
+
+  case 'number':
+    switch (propertySchema.format || '') {
+    case 'float':
+      return Sequelize.FLOAT;
+
+    default:
+      return Sequelize.DOUBLE;
+    }
+
+  default:
+    console.log('Warning: encountered', JSON.stringify(propertySchema));
+    console.log('Unknown data type, falling back to blob');
+    return Sequelize.BLOB;
   }
 }
 
@@ -141,31 +139,41 @@ function getPropertyType(models, currentModel, propertySchema) {
  * @param  {[type]} schema [description]
  * @return {[type]}        [description]
  */
-function generateProperties (schema) {
+function generateProperties (modelName, schema) {
   var result = {
-    schema: schema
+    properties: {},
     bindings: [],
     hiddenFields: []
   };
 
-  Object.keys(schema.properties).forEach((propertyName) => {
+  var properties = Object.keys(schema.properties);
+  for (var i = 0, len = properties.length; i < len; i++ ) {
+    var propertyName = properties[i];
     var propertySchema = schema.properties[propertyName];
-    var type = getSequalizeType(propertySchema);
-    
-    if (properties.type instanceof Function) {
-      result.bindings.push(type);
+    var type = getPropertyType(models, modelName, propertySchema);
+
+    // @TODOL; Figure this out
+    if (type.super_ !== undefined || typeof type === 'object') {
+      result.properties[propertyName] = {
+        type: type
+      };
     } else {
-      propertySchema.type = type;
+      result.bindings.push(type);
+      continue;
     }
 
     if (propertySchema.default) {
-      propertySchema.defaultValue = propertySchema.default;
+      result.properties[propertyName].defaultValue = propertySchema.default;
     }
 
-    if(propertySchema.description.indexOf('(hidden)') > -1) {
-        result.hiddenFields.push(propertyName);
-   }
-  });
+    if (propertySchema.description && propertySchema.description.indexOf('(hidden)') > -1) {
+      result.hiddenFields.push(propertyName);
+    }
+
+    if (propertyName === 'id') {
+      result.properties[propertyName].primaryKey = true;
+    }
+  }
 
   return result;
 }
@@ -175,8 +183,8 @@ function generateProperties (schema) {
  * @param  {[type]} yamlContents [description]
  * @return {[type]}              [description]
  */
-module.exports = {
-  initialize: function initialize(yamlPath, sequelize, options) {
+var models = {
+  initialize: function initialize(swaggerConfig, sequelize, options) {
     var bindings = [];
 
     if(options === undefined) {
@@ -186,39 +194,33 @@ module.exports = {
     }
 
     if (Object.keys(this).length === 1) {
-      var yamlContents = fs.readFileSync(yamlPath, 'utf8');
-      var swaggerConfig = jsyaml.safeLoad(yamlContents);  
-
       // Prepare models
       for (var i in swaggerConfig.definitions) {
-        if (isValidModelName.call(swaggerConfig, i)) {
-          var properties = generateProperties(swaggerConfig.definitions[i]);
-          this[i] = sequelize.define(i, properties.schema)
-          bindings = bindings.concat(properties.bindings)
+        if (isValidModelName.call(swaggerConfig.definitions, i)) {
+          var schema = generateProperties(i, swaggerConfig.definitions[i]);
+          this[i] = sequelize.define(i, schema.properties);
+          bindings = bindings.concat(schema.bindings);
         }
       }
 
-      // Generate models
-      for (var i in swaggerConfig.definitions) {
-        if (isValidModelName.call(swaggerConfig, i)) {
-
-        }
+      // Bind models
+      for (i = 0; i < bindings.length; i++) {
+        bindings[i]();
       }
 
       // Sync them
       if (options.autosync) {
         for (i in this) {
           if(isValidModelName.call(this, i)) {
-            console.log(i);
             this[i].sync({force: true});
           }
         }
       }
+      process.exit(0);
 
       delete this.initialize;
     }
   }  
-
-}
+};
 
 module.exports = models;
