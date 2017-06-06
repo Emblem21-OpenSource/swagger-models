@@ -24,9 +24,9 @@ function getPropertyType(models, currentModelName, propertySchema) {
   if (propertySchema.$ref) {
     return function binding() {
       var targetModelName = propertySchema.$ref.replace('#/definitions/', '');
-      var targetModel = models[targetModelName];
-      models[currentModelName].hasOne(targetModel);
-      models[currentModelName].belongsTo(targetModel, { as: targetModelName, foreignKey: 'id', constraints: false});
+      var currentModel = models[currentModelName];
+      models[targetModelName].hasMany(currentModel);
+      models[targetModelName].belongsTo(currentModel, { as: currentModelName, foreignKey: 'id', constraints: false});
     };
   }
 
@@ -89,9 +89,9 @@ function getPropertyType(models, currentModelName, propertySchema) {
     if(propertySchema.items.$ref) {
       return function binding () {
         var targetModelName = propertySchema.items.$ref.replace('#/definitions/', '');
-        var targetModel = models[targetModelName];
-        models[currentModelName].hasMany(targetModel);
-        models[currentModelName].belongsTo(targetModel, { as: targetModelName, foreignKey: 'id', constraints: false});
+        var currentModel = models[currentModelName];
+        models[targetModelName].hasMany(currentModel);
+        models[targetModelName].belongsTo(currentModel, { as: currentModelName, foreignKey: 'id', constraints: false});
       };
     } else {
       console.log('Warning: encountered', JSON.stringify(propertySchema));
@@ -209,7 +209,7 @@ var models = {
       }
 
       // Sync them
-      sequelize.sync(done);
+      sequelize.sync(done);    
 
       delete this.initialize;
     }
