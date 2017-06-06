@@ -184,7 +184,7 @@ function generateProperties (modelName, schema) {
  * @return {[type]}              [description]
  */
 var models = {
-  initialize: function initialize(swaggerConfig, sequelize, options) {
+  initialize: function initialize(swaggerConfig, sequelize, options, done) {
     var bindings = [];
 
     if(options === undefined) {
@@ -209,14 +209,7 @@ var models = {
       }
 
       // Sync them
-      if (options.autosync) {
-        for (i in this) {
-          if(isValidModelName.call(this, i)) {
-            this[i].sync({force: true});
-          }
-        }
-      }
-      process.exit(0);
+      sequelize.sync(done);
 
       delete this.initialize;
     }
