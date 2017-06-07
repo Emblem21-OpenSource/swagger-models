@@ -6,7 +6,7 @@ var Sequelize = require('sequelize');
  * @return {[type]}      [description]
  */
 function isValidModelName(name) {
-  return name[0].toUpperCase() === name[0] && this.hasOwnProperty(name);
+  return name[0].toUpperCase() === name[0];
 }
 
 /**
@@ -23,6 +23,10 @@ function getPropertyType(models, currentModelName, propertySchema) {
 
   if (propertySchema.$ref) {
     return function binding() {
+      if (isValidModelName(propertySchema.$ref)) {
+        return;
+      }
+
       var targetModelName = propertySchema.$ref.replace('#/definitions/', '');
       var currentModel = models[currentModelName];
       models[targetModelName].hasMany(currentModel);
@@ -88,6 +92,10 @@ function getPropertyType(models, currentModelName, propertySchema) {
     // } else {
     if(propertySchema.items.$ref) {
       return function binding () {
+        if (isValidModelName(propertySchema.items.$ref)) {
+          return;
+        }
+
         var targetModelName = propertySchema.items.$ref.replace('#/definitions/', '');
         var currentModel = models[currentModelName];
         models[targetModelName].hasMany(currentModel);
@@ -196,7 +204,7 @@ var models = {
     if (Object.keys(this).length === 1) {
       // Prepare models
       for (var i in swaggerConfig.definitions) {
-        if (isValidModelName.call(swaggerConfig.definitions, i)) {
+        if (isValidModelName(i)) {
           var schema = generateProperties(i, swaggerConfig.definitions[i]);
           this[i] = sequelize.define(i, schema.properties);
           bindings = bindings.concat(schema.bindings);
