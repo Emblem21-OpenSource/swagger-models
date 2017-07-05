@@ -217,7 +217,7 @@ var models = {
       }
 
       // Sync them
-      sequelize.sync(done);    
+      sequelize.sync().then(done);    
 
       delete this.initialize;
     }
